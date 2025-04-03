@@ -5,7 +5,7 @@ on:
   workflow_call:
     inputs:
       build_type:
-        description: The type of build version to produce ("stable", "rc", or "dev")
+        description: The type of build version to produce ("rc", or "dev")
         type: string
         default: "dev"
       package_suffix:
@@ -14,29 +14,22 @@ on:
   workflow_dispatch:
     inputs:
       build_type:
-        description: The type of build version to produce ("stable", "rc", or "dev")
+        description: The type of build version to produce ("rc", or "dev")
         type: string
         default: "rc"
       package_suffix:
         type: string
   # Trigger on a schedule to build nightly release candidates.
-#   schedule:
-#     # Runs at 11:00 AM UTC, which is 3:00 AM PST (UTC-8)
-#     - cron: '0 11 * * *'
+  schedule:
+    # Runs at 11:00 AM UTC, which is 3:00 AM PST (UTC-8)
+    - cron: '0 11 * * *'
 
 permissions:
   contents: read
 
-concurrency:
-  # A PR number if a pull request and otherwise the commit hash. This cancels
-  # queued and in-progress runs for the same PR (presubmit) or commit
-  # (postsubmit). The workflow name is prepended to avoid conflicts between
-  # different workflows.
-  group: ${{ github.workflow }}-${{ github.event.number || github.sha }}
-  cancel-in-progress: true
-
 jobs:
   setup_metadata:
+    if: ${{ github.repository_owner == 'ROCm' || github.event_name != 'schedule' }}
     runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.version.outputs.version }}
@@ -69,8 +62,7 @@ jobs:
 
   portable_linux_packages:
     name: ${{ matrix.target_bundle.amdgpu_family }}::Build Portable Linux
-    #runs-on: azure-linux-scale-rocm
-    runs-on: ubuntu-24.04
+    runs-on: ${{ github.repository_owner == 'ROCm' && 'azure-linux-scale-rocm' ||  'ubuntu-24.04'  }}
     permissions:
       contents: write
     needs: [setup_metadata]
@@ -78,15 +70,15 @@ jobs:
       TEATIME_LABEL_GH_GROUP: 1
       OUTPUT_DIR: ${{ github.workspace }}/output
       BUILD_IMAGE: ghcr.io/rocm/therock_build_manylinux_x86_64:main
-      DIST_ARCHIVE: "${{ github.workspace }}/output/therock-dist-${{ matrix.target_bundle.amdgpu_family }}${{ github.events.input.package_suffix }}-${{ needs.setup_metadata.outputs.version }}.tar.gz"
+      DIST_ARCHIVE: "${{ github.workspace }}/output/therock-dist-linux-${{ matrix.target_bundle.amdgpu_family }}${{ inputs.package_suffix }}-${{ needs.setup_metadata.outputs.version }}.tar.gz"
     strategy:
       fail-fast: false
       matrix:
         target_bundle:
           - amdgpu_family: "gfx94X-dcgpu"
-        #   - amdgpu_family: "gfx110X-dgpu"
-        #   - amdgpu_family: "gfx1151"
-        #   - amdgpu_family: "gfx1201"
+          - amdgpu_family: "gfx110X-dgpu"
+          - amdgpu_family: "gfx1151"
+          - amdgpu_family: "gfx1201"
 
 
     steps:
@@ -95,6 +87,24 @@ jobs:
       - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
         with:
           python-version: '3.10'
+      # TODO: We shouldn't be using a cache on actual release branches, but it
+      # really helps for iteration time.
+      - name: Enable cache
+        uses: actions/cache/restore@d4323d4df104b026a6aa633fdb11d772146be0bf # v4.2.2
+        with:
+          path: ${{ env.OUTPUT_DIR }}/caches
+          key: portable-linux-package-matrix-v1-${{ matrix.target_bundle.amdgpu_family }}-${{ github.sha }}
+          restore-keys: |
+            portable-linux-package-matrix-v1-${{ matrix.target_bundle.amdgpu_family }}-
+
+    #   - name: Fetch sources
+    #     run: |
+    #       # Prefetch docker container in background.
+    #       docker pull ${{ env.BUILD_IMAGE }} &
+    #       git config --global user.email "nobody@amd.com"
+    #       git config --global user.name "Nobody"
+    #       ./build_tools/fetch_sources.py --jobs 10
+    #       wait
 
       - name: Build Projects
         run: |
@@ -103,6 +113,17 @@ jobs:
           cd ${{ env.OUTPUT_DIR }}/build/dist/rocm
           echo "Building ${{ env.DIST_ARCHIVE }}"
           tar cfz "${{ env.DIST_ARCHIVE }}" .
+
+    #   - name: Build Projects
+    #     run: |
+    #       ./build_tools/linux_portable_build.py \
+    #         --image=${{ env.BUILD_IMAGE }} \
+    #         --output-dir=${{ env.OUTPUT_DIR }} \
+    #         -- \
+    #         "-DTHEROCK_AMDGPU_FAMILIES=${{ matrix.target_bundle.amdgpu_family }}"
+    #       cd ${{ env.OUTPUT_DIR }}/build/dist/rocm
+    #       echo "Building ${{ env.DIST_ARCHIVE }}"
+    #       tar cfz "${{ env.DIST_ARCHIVE }}" .
 
       - name: Upload Nightly Release
         if: ${{ inputs.build_type == 'rc' || inputs.build_type == '' }}
@@ -137,11 +158,9 @@ jobs:
           echo "------------"
           du -h -d 1 ${{ env.OUTPUT_DIR }}/build/dist/rocm
 
-    #   - name: Save cache
-    #     uses: actions/cache/save@d4323d4df104b026a6aa633fdb11d772146be0bf # v4.2.2
-    #     if: always()
-    #     with:
-    #       path: ${{ env.OUTPUT_DIR }}/caches
-    #       key: portable-linux-package-matrix-v1-${{ matrix.target_bundle.amdgpu_family }}-${{ github.sha }}
-
-
+      - name: Save cache
+        uses: actions/cache/save@d4323d4df104b026a6aa633fdb11d772146be0bf # v4.2.2
+        if: always()
+        with:
+          path: ${{ env.OUTPUT_DIR }}/caches
+          key: portable-linux-package-matrix-v1-${{ matrix.target_bundle.amdgpu_family }}-${{ github.sha }}
