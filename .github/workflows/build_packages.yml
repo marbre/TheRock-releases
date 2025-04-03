@@ -95,24 +95,6 @@ jobs:
       - uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
         with:
           python-version: '3.10'
-      # TODO: We shouldn't be using a cache on actual release branches, but it
-      # really helps for iteration time.
-    #   - name: Enable cache
-    #     uses: actions/cache/restore@d4323d4df104b026a6aa633fdb11d772146be0bf # v4.2.2
-    #     with:
-    #       path: ${{ env.OUTPUT_DIR }}/caches
-    #       key: portable-linux-package-matrix-v1-${{ matrix.target_bundle.amdgpu_family }}-${{ github.sha }}
-    #       restore-keys: |
-    #         portable-linux-package-matrix-v1-${{ matrix.target_bundle.amdgpu_family }}-
-
-    #   - name: Fetch sources
-    #     run: |
-    #       # Prefetch docker container in background.
-    #       docker pull ${{ env.BUILD_IMAGE }} &
-    #       git config --global user.email "nobody@amd.com"
-    #       git config --global user.name "Nobody"
-    #       ./build_tools/fetch_sources.py --jobs 10
-    #       wait
 
       - name: Build Projects
         run: |
