@@ -1,0 +1,43 @@
+name: TheRock Release
+
+on:
+  # Trigger manually (typically to test the workflow or manually build a release [candidate])
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: The type of build version to produce ("nightly", or "dev")
+        type: string
+        default: "dev"
+      package_suffix:
+        type: string
+      s3_subdir:
+        description: "Subdirectory to push the packages"
+        type: string
+        default: "v2"
+      s3_staging_subdir:
+        description: "Staging subdirectory to push the packages"
+        type: string
+        default: "v2-staging"
+#   # Trigger on a schedule to build nightly release candidates.
+#   schedule:
+#     # Runs at 04:00 AM UTC, which is 8:00 PM PST (UTC-8)
+#     - cron: '0 04 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  linux_packages:
+    name: Build
+    uses: marbre/TheRock/.github/workflows/release_portable_linux_packages.yml@users/marbre/therock-releases
+    secrets: inherit
+    with:
+      release_type: ${{ inputs.release_type || 'nightly' }}
+      package_suffix: ""
+      s3_subdir: ${{ inputs.s3_subdir || 'v2' }}
+      s3_staging_subdir: ${{ inputs.s3_staging_subdir || 'v2-staging' }}
+      repository: "marbre/TheRock"
+    permissions:
+      actions: write
+      contents: write
+      id-token: write
