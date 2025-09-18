@@ -29,7 +29,7 @@ permissions:
 jobs:
   linux_packages:
     name: Build
-    uses: marbre/TheRock/.github/workflows/release_portable_linux_packages.yml@users/marbre/therock-releases
+    uses: marbre/TheRock/.github/workflows/release_portable_linux_packages.yml@users/marbre/therock-releases-testing
     secrets: inherit
     with:
       release_type: ${{ inputs.release_type || 'nightly' }}
