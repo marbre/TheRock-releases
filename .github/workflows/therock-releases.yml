@@ -18,6 +18,9 @@ on:
         description: "Staging subdirectory to push the packages"
         type: string
         default: "v2-staging"
+      ref:
+        description: "Branch, tag or SHA to checkout. Otherwise, uses the default branch."
+        type: string
 #   # Trigger on a schedule to build nightly release candidates.
 #   schedule:
 #     # Runs at 04:00 AM UTC, which is 8:00 PM PST (UTC-8)
@@ -37,6 +40,7 @@ jobs:
       s3_subdir: ${{ inputs.s3_subdir || 'v2' }}
       s3_staging_subdir: ${{ inputs.s3_staging_subdir || 'v2-staging' }}
       repository: "marbre/TheRock"
+      ref: ${{ inputs.ref || '' }}
     permissions:
       actions: write
       contents: write
